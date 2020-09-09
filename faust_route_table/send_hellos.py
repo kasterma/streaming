@@ -17,4 +17,4 @@ async def hello():
     val = f"hellohello-{key}"
     hello_counts_send[val] += 1
     await hello_topic.send(key=val, value=val)
-    print(json.dumps(hello_counts_send))
+    print(json.dumps(hello_counts_send, sort_keys=True))
