@@ -1,0 +1,8 @@
+-i http://localhost:8989/root/pypi/+simple/
+
+bandit
+black
+faust
+hypothesis
+pytest
+safety
