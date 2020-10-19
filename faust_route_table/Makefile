@@ -5,7 +5,7 @@ all: venv test format scan
 .PHONY: venv
 venv:
 	python3.8 -m venv venv
-	${VENV} ; pip install -i http://localhost:8989/root/pypi/+simple/ --upgrade pip
+	${VENV} ; pip install --upgrade pip # pip install -i http://localhost:8989/root/pypi/+simple/ --upgrade pip
 	${VENV} ; pip install -r requirements.txt
 
 .PHONY: clean
@@ -48,4 +48,4 @@ run/worker:
 	${VENV} ; faust -A get_hellos worker -l info --web-port ${WEB_PORT} --web-host localhost
 
 query:
-	for i in $(shell seq 0 11); do curl localhost:6667/count/?i=hellohello-$$i; echo; done
+	for i in $(shell seq 0 11); do curl localhost:6669/count/?i=hellohello-$$i; echo; done

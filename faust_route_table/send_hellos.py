@@ -18,3 +18,6 @@ async def hello():
     hello_counts_send[val] += 1
     await hello_topic.send(key=val, value=val)
     print(json.dumps(hello_counts_send, sort_keys=True))
+
+if __name__ == "__main__":
+    app.main()

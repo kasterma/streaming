@@ -1,4 +1,4 @@
--i http://localhost:8989/root/pypi/+simple/
+#-i http://localhost:8989/root/pypi/+simple/
 
 bandit
 black
