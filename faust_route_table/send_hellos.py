@@ -11,7 +11,7 @@ app = faust.App("send-hello")
 hello_topic = app.topic("hellos-here")
 hello_counts_send = defaultdict(int)
     
-@app.timer(interval=1)
+@app.timer(interval=2)
 async def hello():
     key = str(random.randint(0, 10))
     val = f"hellohello-{key}"
