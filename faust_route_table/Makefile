@@ -19,6 +19,7 @@ up:
 .PHONY: topics
 topics:
 	docker exec -ti faust_route_table_kafka_1 kafka-topics --create --topic hellos-here --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
+	docker exec -ti faust_route_table_kafka_1 kafka-topics --create --topic points-here --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
 
 .PHONY: list-topics
 list-topics:

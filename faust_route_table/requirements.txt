@@ -2,7 +2,7 @@
 
 bandit
 black
-faust
+#faust
 hypothesis
 pytest
 safety
