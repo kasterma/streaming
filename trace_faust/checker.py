@@ -6,9 +6,9 @@ count_topic = app.topic("counts")
 alert_topic = app.topic("alert")
 
 @app.agent(count_topic)
-async def counter(t):
+async def checker(t):
     async for e in t:
-        for k, v in e:
+        for k, v in e.items():
             if v % 10 == 0:
                 val=f"{k} has hapened multiple of 10 times (ct={v})."
                 await alert_topic.send(value=val)
