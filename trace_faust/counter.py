@@ -1,5 +1,6 @@
 import faust
 from traceutils import init_tracer
+from opentracing.propagation import Format
 
 tracer = init_tracer('counter')
 
@@ -15,7 +16,11 @@ async def counter(t):
         with tracer.start_span('send-event') as span:
             event_counts[e] += 1
             with tracer.start_span('send', span):
-                await count_topic.send(value={e: event_counts[e]})
+                headers = {}
+                tracer.inject(span, Format.HTTP_HEADERS, headers)
+                print(headers)
+                headers = {k: v.encode() for k, v in headers.items()}
+                await count_topic.send(value={e: event_counts[e]}, headers=headers)
             with tracer.start_span('print-table', span):
                 for k,v in event_counts.items():
                     print(f"{k}: {v}")
