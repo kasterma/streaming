@@ -3,6 +3,7 @@
 Run a simple Faust example, and collect tracing data about the data flow that results.
 
 0. kafka docker-compose
+   copy-paste from other dir + version update
 
 1. make example; Faust flow
      generator different events
@@ -14,3 +15,4 @@ Run a simple Faust example, and collect tracing data about the data flow that re
 2. add tracing instrumentation: opentracing, faust/utils/tracing.py
 
 3. collect somewhere; jeager, collector  (<--- docker-compose completion)
+   https://github.com/jaegertracing/jaeger/blob/master/docker-compose/jaeger-docker-compose.yml
