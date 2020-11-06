@@ -16,3 +16,4 @@ Run a simple Faust example, and collect tracing data about the data flow that re
 
 3. collect somewhere; jeager, collector  (<--- docker-compose completion)
    https://github.com/jaegertracing/jaeger/blob/master/docker-compose/jaeger-docker-compose.yml
+   http://localhost:16686  <- UI for jeager, here is where the data should eventually appear
