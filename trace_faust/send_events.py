@@ -15,8 +15,10 @@ event_counts_send = defaultdict(int)
 async def send_events():
     with tracer.start_span('send-event') as span:
         val = random.choice(["a", "b", "c", "d", "e", "f"])
+        span.set_tag("choice", val)
         event_counts_send[val] += 1
         await event_topic.send(value=val)
+        span.log_kv({"send": True, "val": val})
         print(json.dumps(event_counts_send, sort_keys=True))
 
 

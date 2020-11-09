@@ -1,5 +1,6 @@
 import faust
 from traceutils import init_tracer
+import asyncio
 
 from opentracing.propagation import Format
 from opentracing.tracer import follows_from
@@ -18,12 +19,15 @@ async def checker(t):
         headers = {k: v.decode() for k, v in headers.items()}
         print(headers)
         span_ctx = tracer.extract(Format.HTTP_HEADERS, headers)
-        with tracer.start_span('check', references=follows_from(span_ctx)):
+        with tracer.start_span('check', references=follows_from(span_ctx)) as span:
             for k, v in e.value.items():
+                span.set_tag("alert", v % 10 == 0)
+                span.log_kv({"key": k, "val": v})
                 if v % 10 == 0:
                     val=f"{k} has hapened multiple of 10 times (ct={v})."
                     await alert_topic.send(value=val)
                     print(val)
+                    await asyncio.sleep(1)
 
 if __name__ == "__main__":
     app.main()

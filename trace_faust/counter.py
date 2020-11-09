@@ -15,6 +15,8 @@ async def counter(t):
     async for e in t:
         with tracer.start_span('send-event') as span:
             event_counts[e] += 1
+            span.set_tag("count", event_counts[e])
+            span.set_tag("key", e)
             with tracer.start_span('send', span):
                 headers = {}
                 tracer.inject(span, Format.HTTP_HEADERS, headers)
