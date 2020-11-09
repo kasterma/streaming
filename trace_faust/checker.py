@@ -13,8 +13,8 @@ alert_topic = app.topic("alert")
 
 @app.agent(count_topic)
 async def checker(t):
-    async for e in t.channel:
-        headers = e.headers #???
+    async for e in t.events():
+        headers = e.headers
         headers = {k: v.decode() for k, v in headers.items()}
         print(headers)
         span_ctx = tracer.extract(Format.HTTP_HEADERS, headers)
