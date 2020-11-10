@@ -14,12 +14,16 @@ clean:
 
 .PHONY: up
 up:
-	docker-compose up -d
+	docker-compose up
 
 .PHONY: topics
 topics:
 	docker exec -ti faust_route_table_kafka_1 kafka-topics --create --topic hellos-here --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
 	docker exec -ti faust_route_table_kafka_1 kafka-topics --create --topic points-here --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
+
+show-changelog:
+	docker exec -ti faust_route_table_kafka_1 kafka-console-consumer --bootstrap-server localhost:9092 --topic get-hello-hello_counts-changelog --from-beginning
+
 
 .PHONY: list-topics
 list-topics:
@@ -45,8 +49,14 @@ scan:
 run/generator:
 	${VENV} ; faust -A send_hellos worker -l info
 
-run/worker:
-	${VENV} ; faust -A get_hellos worker -l info --web-port ${WEB_PORT} --web-host localhost
+run-worker-1:
+	${VENV} ; faust -A get_hellos worker -l info --web-port 6067 --web-host localhost
 
-query:
-	for i in $(shell seq 0 11); do curl localhost:6669/count/?i=hellohello-$$i; echo; done
+run-worker-2:
+	${VENV} ; faust -A get_hellos worker -l info --web-port 6068 --web-host localhost
+
+query-worker-1:
+	for i in $(shell seq 0 10); do curl localhost:6067/count/?i=hellohello-$$i; echo; done
+
+query-worker-2:
+	for i in $(shell seq 0 10); do curl localhost:6068/count/?i=hellohello-$$i; echo; done
