@@ -16,11 +16,14 @@ id = 0
 @app.timer(interval=1)
 async def send_events():
     global id
-    val = random.choice(["a", "b", "c", "d", "e", "f"])
-    event_counts_send[val] += 1
-    await event_topic.send(key=val, value=val, headers={'id': str(id).encode()})
-    id += 1
-    print(json.dumps(event_counts_send, sort_keys=True))
+    with tracer.start_span('send-event') as span:
+        val = random.choice(["a", "b", "c", "d", "e", "f"])
+        span.set_tag("choice", val)
+        event_counts_send[val] += 1
+        await event_topic.send(key=val, value=val, headers={'id': str(id).encode()})
+        id += 1
+        span.log_kv({"send": True, "val": val})
+        print(json.dumps(event_counts_send, sort_keys=True))
 
 
 if __name__ == "__main__":
