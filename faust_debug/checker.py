@@ -2,11 +2,6 @@ import faust
 from traceutils import init_tracer
 import asyncio
 
-from opentracing.propagation import Format
-from opentracing.tracer import follows_from
-
-tracer = init_tracer('alert')
-
 app = faust.App("checker")
 
 count_topic = app.topic("counts")

@@ -1,10 +1,11 @@
 import faust
-from traceutils import init_tracer
-from opentracing.propagation import Format
+from faust.sensors.monitor import Monitor
 
-tracer = init_tracer('counter')
+class PrintCommitMonitor(Monitor):
+    def on_tp_commit(self, tp_offsets):
+        print(f'Commit offsets {tp_offsets}')
 
-app = faust.App("count-events")
+app = faust.App("count-events", Monitor=PrintCommitMonitor,)
 
 event_topic = app.topic("raw-events")
 count_topic = app.topic("counts")

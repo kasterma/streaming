@@ -5,9 +5,9 @@ venv:
 	${VENV} ; pip install -r requirements.txt
 
 topics:
-	docker exec -ti trace_faust_kafka_1 kafka-topics --create --topic raw-events --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
-	docker exec -ti trace_faust_kafka_1 kafka-topics --create --topic counts --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
-	docker exec -ti trace_faust_kafka_1 kafka-topics --create --topic alerts --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
+	docker exec -ti faust_debug_kafka_1 kafka-topics --create --topic raw-events --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
+	docker exec -ti faust_debug_kafka_1 kafka-topics --create --topic counts --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
+	docker exec -ti faust_debug_kafka_1 kafka-topics --create --topic alerts --zookeeper zookeeper:2181 --partitions 8 --replication-factor 1
 
 generator:
 	${VENV} ; faust -A send_events worker -l info

@@ -2,9 +2,6 @@ import faust
 import random
 from collections import defaultdict
 import json
-from traceutils import init_tracer
-
-tracer = init_tracer('send_events')
 
 app = faust.App("send-events")
 
