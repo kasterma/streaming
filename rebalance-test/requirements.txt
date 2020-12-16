@@ -5,4 +5,4 @@ opentracing==2.3.0
 fastapi
 uvicorn
 fastapi_contrib[jaegertracing]
-
+pyyaml

@@ -6,6 +6,9 @@ from collections import defaultdict
 import json
 import uuid
 from typing import Dict, List
+import logging
+from logging.config import dictConfig
+import yaml
 
 # Thu: need to ensure that on_partitions_revoked doesn't finish before all msgs in flight have be handled.
 # Fri: there may be locking in aiokafka itself, also in ways that are hard to test for.
@@ -13,13 +16,16 @@ from typing import Dict, List
 # Assumption: RL fixes mem, and mem partitions are determined by *one* other topic.
 #   Is this true in our use cases?
 
-# TODO: logging improve a little bit (is already GREAT, there is no better logging) MLGA
 # TODO: active mem cleaned up
 # TODO: keep previous versions of mem for MLGA
 # DONE: generator from earliest
 # TODO: memory updater topic configurable
 # TODO: MCGA (make code great again), polish: there are some things clearly not in the right classes
 
+with open("logging.yaml") as f:
+    dictConfig(yaml.load(f))
+
+log: logging.Logger = logging.getLogger("counter")
 
 class Mem:
     def __init__(self, producer):
@@ -30,15 +36,13 @@ class Mem:
     def _setitem(self, key: str, value: List[int]):
         print(f"before {self._mem}")
         self._mem[key] = value
-        print(f"after {self._mem}")
+        log.debug(f"_mem {self._mem}")
 
     async def setitem(self, key: str, value: List[int]):
         self._setitem(key, value)
-        print("before bdvas;fhdvzfsuifhdabvkhfjasldh")
         await self.producer.send(topic=self.memupdate_topicname,
                                  key=key.encode(),
                                  value=json.dumps(self._mem[key]).encode())
-        print("after   dlnksagidyoalbdhyaujdlfkasghdfjaskh")
 
     def __getitem__(self, item: str) -> List[int]:
         return self._mem[item]
@@ -52,21 +56,22 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
         self.st = sleepytime
 
     async def on_partitions_revoked(self, revoked):
-        print("Revoked", revoked)
+        log.info(f"Revoked {revoked}")
         await self.consume_lock.acquire()  # pause processing of messages, when past this point no messages in flight
-        print("now have lock, i.e. no messages in flight")
+        log.debug("now have lock, i.e. no messages in flight")
         await asyncio.sleep(self.st)
 
     async def on_partitions_assigned(self, assigned):
-        print("Assigned", assigned)
+        log.info(f"Assigned {assigned}")
         await self.mem_updater(assigned)
         self.consume_lock.release()  # start processing of messages again, partitions assigned are table
+        log.debug("lock released")
         # TODO: is it ok to release lock in on revoked (just ensure there is no message in flight, then ok???)
 
     async def mem_updater(self, topic_partitions):
         # b/c all on_partitions_revoked have been called nothing is getting produced to the topic anymore
         # that means we can add tokens that we can read back to see we are fully up to date
-        print(f"Updating mem for partitions {sorted(p.partition for p in topic_partitions)} : {topic_partitions}")
+        log.info(f"Updating mem for partitions {sorted(p.partition for p in topic_partitions)} : {topic_partitions}")
 
         if len(set(p.topic for p in topic_partitions)) > 1:
             raise Exception("boom: multiple topics reassinged, unexpected")
@@ -84,7 +89,7 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
                                 key="token".encode(),  # to allow for compaction, don't need earlier uptodate_token
                                 value=uptodate_token)
         await producer.stop()
-        print("produced ;lhkjdtr67uygkhjco70-yofjccjhkgopu[uhlgkjvbmnlj;op[]")
+        log.debug("produced tokens to mem-updater topic.")
 
         consumer = aiokafka.AIOKafkaConsumer(
             group_id=f"mem-updater-{self.group_id_id}", auto_offset_reset='earliest'
@@ -94,37 +99,34 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
         parts = [TopicPartition(self.mem.memupdate_topicname, t.partition) for t in topic_partitions]
         consumer.assign(partitions=[TopicPartition(self.mem.memupdate_topicname, t.partition) for t in topic_partitions])
         while any(not partitions_done[p.partition] for p in topic_partitions):
-            print(f"stuff lhgkviuhjcujhcughkjvcguuhkgjvnbmhiop {partitions_done} {[await consumer.committed(p) for p in parts]}")
+            log.debug(f"getting msg from mem-updater topic, state: {partitions_done}.")
             msg = await consumer.getone()
-            print(f"more sturfff {msg.partition}")
+            log.debug(f"msg {msg} in partition {msg.partition}")
             if msg.value == uptodate_token:
-                print(f"xxx")
+                log.debug("msg was current uptodate_token.")
                 partitions_done[msg.partition] = True
-                print(f"donedone {partitions_done}")
             else:
-                print(f"xxxysssys")
                 try:
                     headers = {k: v.decode() for k,v in msg.headers}  ## not yet used, but for tracing / types / updates
                     key = msg.key.decode()
                     value = json.loads(msg.value.decode())
                     # noinspection PyProtectedMember
                     self.mem._setitem(key, value)
-                    print(f"Mem updated: {key} with value: {value}")
+                    log.debug(f"Mem updated: {key} with value: {value}")
                 except Exception as e:
-                    print(f"Expect decode errors here {e}")
+                    log.debug(f"Expect decode errors here {e}: {msg} should be outdated uptodate_token.")
 
         await consumer.stop()
-        print(f"het gaat gewoon goed, sukkel")
+        log.info(f"Mem update complete.")
 
 
 async def handle_msg(msg, mem):
-    print(f"  Handling msg: {msg.offset}-->{msg.key}:{msg.value}.")
+    log.info(f"  Handling msg: {msg.offset}-->{msg.key}:{msg.value}.")
     val = mem[msg.key.decode()]
     val.append(int(msg.value.decode()))
-    print(f"       Set to value {val}  <--- {int(msg.value.decode())}")
     await mem.setitem(msg.key.decode(),
                       val)
-    print(f"  Done handling msg: {msg.value}")
+    log.info(f"  Done handling msg: {msg.value}")
 
 
 async def main(msg_sleep, rb_sleepytime, group_id_id):
@@ -146,13 +148,13 @@ async def main(msg_sleep, rb_sleepytime, group_id_id):
                     msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
                     await handle_msg(msg, mem)
                     await consumer.commit()
-                    print(f"  Committed {await consumer.committed(TopicPartition(msg.topic, msg.partition))}, assigned {sorted([t.partition for t in consumer.assignment()])}")
+                    log.debug(f"  Committed {await consumer.committed(TopicPartition(msg.topic, msg.partition))}, assigned {sorted([t.partition for t in consumer.assignment()])}")
                 except asyncio.TimeoutError as e:
-                    # print(f"timeout error {e}")  # this is perfectly fine, maybe no events to handle
+                    # no messages in timeout time, this is normal behavior in case you produce less than 1 a second.
                     pass
 
     except Exception as e:
-        print(f"Error encountered: {e}")
+        log.info(f"Error encountered: {e}")
     finally:
         await consumer.stop()
 
