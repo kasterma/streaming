@@ -16,7 +16,7 @@ async def main():
             msg = str(next_item[key]).encode()
             await producer.send("events", key=key.encode(), value=msg)
             next_item[key] += 1
-            await asyncio.sleep(20)
+            await asyncio.sleep(2)
     except Exception as e:
         print(f"Error encountered: {repr(e)}")
     finally:

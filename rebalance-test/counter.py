@@ -17,6 +17,7 @@ import yaml
 #   Is this true in our use cases?
 
 # TODO: active mem cleaned up
+# TODO: some keys get their values reset at times
 # TODO: keep previous versions of mem for MLGA
 # DONE: generator from earliest
 # TODO: memory updater topic configurable
@@ -27,6 +28,11 @@ with open("logging.yaml") as f:
 
 log: logging.Logger = logging.getLogger("counter")
 
+
+class IncorrectMemException(Exception):
+    pass
+
+
 class Mem:
     def __init__(self, producer):
         self._mem: Dict[str, List[int]] = defaultdict(list)
@@ -34,9 +40,11 @@ class Mem:
         self.producer = producer
 
     def _setitem(self, key: str, value: List[int]):
-        print(f"before {self._mem}")
         self._mem[key] = value
-        log.debug(f"_mem {self._mem}")
+        log.debug(f"_mem {self}")
+        if not self.mem_correct():
+            log.error("Mem not correct")
+            raise IncorrectMemException(self)
 
     async def setitem(self, key: str, value: List[int]):
         self._setitem(key, value)
@@ -46,6 +54,30 @@ class Mem:
 
     def __getitem__(self, item: str) -> List[int]:
         return self._mem[item]
+
+    @staticmethod
+    def shortlist(l):
+        l_min, l_max = min(l), max(l)
+        if l == list(range(l_min, l_max+1)) and len(l) > 2:
+            #good
+            return f"[{l[0]}, ..., {l[-1]}]"
+        else:
+            #bad, or short
+            return str(l)
+
+    @staticmethod
+    def value_correct(l):
+        return l == list(range(len(l)))
+
+    def mem_correct(self):
+        return all(self.value_correct(v) for v in self._mem)
+
+    def __str__(self):
+        ks = sorted(self._mem.keys())
+        rv = "{\n"
+        for k in ks:
+            rv += f"{k}: {self.shortlist(self._mem[k])},\n"
+        return rv[:-2] + "}"
 
 
 class RebalanceListener(aiokafka.ConsumerRebalanceListener):
@@ -113,7 +145,7 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
                     # noinspection PyProtectedMember
                     self.mem._setitem(key, value)
                     log.debug(f"Mem updated: {key} with value: {value}")
-                except Exception as e:
+                except UnicodeDecodeError as e:
                     log.debug(f"Expect decode errors here {e}: {msg} should be outdated uptodate_token.")
 
         await consumer.stop()
@@ -153,8 +185,6 @@ async def main(msg_sleep, rb_sleepytime, group_id_id):
                     # no messages in timeout time, this is normal behavior in case you produce less than 1 a second.
                     pass
 
-    except Exception as e:
-        log.info(f"Error encountered: {e}")
     finally:
         await consumer.stop()
 
