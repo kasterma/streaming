@@ -1,4 +1,4 @@
-VENV=source venv/bin/activate
+VENV=. venv/bin/activate
 NUMPART=10
 NUMKEYS=1000
 

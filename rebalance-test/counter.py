@@ -11,6 +11,7 @@ from logging.config import dictConfig
 import yaml
 import copy
 import time
+import threading
 
 # Thu: need to ensure that on_partitions_revoked doesn't finish before all msgs in flight have be handled.
 # Fri: there may be locking in aiokafka itself, also in ways that are hard to test for.
@@ -32,26 +33,26 @@ log_timings = logging.getLogger("timings")
 
 class Timer:
     def __init__(self, label):
-        self.label = label
-        self.start = None
-        self.end = None
-        self.running = False
+        self._label = label
+        self._start = None
+        self._end = None
+        self._running = False
 
     def start(self):
-        if self.running:
-            log.error(f"[{self.label}] starting running timer")
-        self.start = time.monotonic()
-        self.running = True
+        if self._running:
+            log.error(f"[{self._label}] starting running timer")
+        self._start = 0 #time.monotonic()
+        self._running = True
 
     def end(self):
-        if not self.running:
-            log.error(f"[{self.label}] stopping stopped timer")
-        self.end = time.monotonic()
-        return self.end - self.start()
+        if not self._running:
+            log.error(f"[{self._label}] stopping stopped timer")
+        self._end = time.monotonic()
+        return self._end - self.start()
 
     def log(self):
         took = self.end()
-        log_timings.info(f"[{self.label}] Took {took}.")
+        log_timings.info(f"[{self._label}] Took {took}.")
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -68,6 +69,8 @@ class CustomAdapter(logging.LoggerAdapter):
 
 log = CustomAdapter(log)
 log_timings = CustomAdapter(log_timings)
+lock_log = CustomAdapter(logging.getLogger("locklog"))
+lock_log.set_id(id)
 
 
 class IncorrectMemException(Exception):
@@ -221,19 +224,26 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
     def __init__(self, consume_lock: asyncio.Lock, mem: Mem):
         self.mem = mem
         self.consume_lock = consume_lock
-        self.timer = Timer("rebalance")
+        self._timer: Timer = Timer("rebalance")
 
     async def on_partitions_revoked(self, revoked):
+        log.info(f"revoked thread id {threading.get_ident()}")
         log.info(f"Revoked {revoked}")
-        self.timer.start()
+        lock_log.info(f"[rbal] before")
+        self._timer.start()
+        lock_log.info(f"[rbal] acquire")
         await self.consume_lock.acquire()  # pause processing of messages, when past this point no messages in flight
+        lock_log.info(f"[rbal] LOCK")
         log.debug("now have lock, i.e. no messages in flight")
 
     async def on_partitions_assigned(self, assigned):
+        log.info(f"assigned thread id {threading.get_ident()}")
         log.info(f"Assigned {assigned}")
         await self.mem.update(assigned)
+        lock_log.info(f"[rbal] release")
         self.consume_lock.release()  # start processing of messages again, partitions assigned are table
-        self.timer.log()
+        lock_log.info(f"[rbal] UNLOCK")
+        self._timer.log()
         log.debug("lock released; msg can fly again")
         # TODO: is it ok to release lock in on revoked (just ensure there is no message in flight, then ok???)
 
@@ -247,6 +257,33 @@ async def handle_msg(msg, mem):
     #log.info(f"setiteminfo ={setitem_info.result()}")   # check partition here  msg.partition == partition of result
     log.info(f"  Done handling msg: {msg.value}")
 
+
+class LoggedLock:
+    def __init__(self, lock: asyncio.Lock, label, id):
+        self._lock = lock
+        self._label = label
+        self.log = CustomAdapter(logging.getLogger("locklog"))
+        self.log.set_id(id)
+
+    async def acquire(self):
+        self.log.debug(f"[{self.label}] trying to get lock")
+        await self._lock.acquire()
+        self.log.debug(f"[{self.label}] LOCK")
+
+    def release(self):
+        self.log.debug(f"[{self.label}] releasing lock")
+        self._lock.release()
+        self.log.debug(f'[{self.label}] UNLOCK')
+
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        return self._lock.__aexit__(exc_type, exc_val, exc_tb)
+
+    def __aenter__(self):
+        return self._lock.__aenter__()
+
+    def __getattr__(self, attr):
+        print(attr)
+        return getattr(self._lock, attr)
 
 async def main(group_id_id):
     mem = Mem(group_id_id=group_id_id)
@@ -271,6 +308,8 @@ async def main(group_id_id):
         # for two topics; do we need two locks, are they going to deadlock?
         while True:
             async with lock:
+                log.info(f"thread id {threading.get_ident()}")
+                lock_log.info(f"[main] LOCK")
                 try:
                     msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
                     await handle_msg(msg, mem)
@@ -280,6 +319,7 @@ async def main(group_id_id):
                 except asyncio.TimeoutError as e:
                     # no messages in timeout time, this is normal behavior in case you produce less than 1 a second.
                     pass
+                lock_log.info(f"[main] release")
 
     finally:
         await consumer.stop()
@@ -291,6 +331,7 @@ async def main(group_id_id):
 def cli(group_id_id):
     log.set_id(group_id_id)
     log_timings.set_id(group_id_id)
+    lock_log.set_id(group_id_id)
     asyncio.run(main(group_id_id))
 
 

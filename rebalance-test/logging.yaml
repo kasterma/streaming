@@ -20,6 +20,11 @@ handlers:
     level: DEBUG
     formatter: simple
     filename: timing.log
+  lockhandler:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: simple
+    filename: lock.log
 loggers:
   counter:
     level: DEBUG
@@ -28,6 +33,10 @@ loggers:
   timings:
     level: INFO
     handlers: [timinghandler]
+    propagate: no
+  locklog:
+    level: INFO
+    handlers: [lockhandler]
     propagate: no
 root:
   level: DEBUG
