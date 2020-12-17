@@ -4,7 +4,7 @@ import click
 import random
 
 
-async def main():
+async def main(delay_ms):
     producer = aiokafka.AIOKafkaProducer()
     await producer.start()
     keys = [f"key-{i}" for i in range(10)]
@@ -16,7 +16,7 @@ async def main():
             msg = str(next_item[key]).encode()
             await producer.send("events", key=key.encode(), value=msg)
             next_item[key] += 1
-            await asyncio.sleep(2)
+            await asyncio.sleep(delay_ms/1000)
     except Exception as e:
         print(f"Error encountered: {repr(e)}")
     finally:
@@ -24,8 +24,9 @@ async def main():
 
 
 @click.command()
-def cli():
-    asyncio.run(main())
+@click.option("--delay-ms", default=1000, type=int)
+def cli(delay_ms):
+    asyncio.run(main(delay_ms))
 
 
 if __name__ == "__main__":
