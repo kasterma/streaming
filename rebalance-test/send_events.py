@@ -4,10 +4,10 @@ import click
 import random
 
 
-async def main(delay_ms):
+async def main(delay_ms, num_keys):
     producer = aiokafka.AIOKafkaProducer()
     await producer.start()
-    keys = [f"key-{i}" for i in range(10)]
+    keys = [f"key-{i}" for i in range(num_keys)]
     next_item = {k: 0 for k in keys}
 
     try:
@@ -25,8 +25,9 @@ async def main(delay_ms):
 
 @click.command()
 @click.option("--delay-ms", default=1000, type=int)
-def cli(delay_ms):
-    asyncio.run(main(delay_ms))
+@click.option("--num-keys", default=5, type=int)
+def cli(delay_ms, num_keys):
+    asyncio.run(main(delay_ms, num_keys))
 
 
 if __name__ == "__main__":

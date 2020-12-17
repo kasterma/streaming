@@ -17,7 +17,7 @@ handlers:
     filename: debug.log
 loggers:
   counter:
-    level: DEBUG
+    level: INFO
     handlers: [console, file]
     propagate: no
 root:
