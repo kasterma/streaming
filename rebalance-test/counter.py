@@ -10,6 +10,7 @@ import logging
 from logging.config import dictConfig
 import yaml
 import copy
+import time
 
 # Thu: need to ensure that on_partitions_revoked doesn't finish before all msgs in flight have be handled.
 # Fri: there may be locking in aiokafka itself, also in ways that are hard to test for.
@@ -17,13 +18,40 @@ import copy
 # Assumption: RL fixes mem, and mem partitions are determined by *one* other topic.
 #   Is this true in our use cases?
 
+# TOOD: inner workings log compaction
 # TODO: memory updater topic configurable
 # TODO: MCGA (make code great again), polish: there are some things clearly not in the right classes
+# TODO: error recovery / defensive programming for recovery from errors / how to restart when there is know corrupted data somewhere / how to make world peace
 
 with open("logging.yaml") as f:
     dictConfig(yaml.load(f, Loader=yaml.SafeLoader))
 
 log = logging.getLogger("counter")
+log_timings = logging.getLogger("timings")
+
+
+class Timer:
+    def __init__(self, label):
+        self.label = label
+        self.start = None
+        self.end = None
+        self.running = False
+
+    def start(self):
+        if self.running:
+            log.error(f"[{self.label}] starting running timer")
+        self.start = time.monotonic()
+        self.running = True
+
+    def end(self):
+        if not self.running:
+            log.error(f"[{self.label}] stopping stopped timer")
+        self.end = time.monotonic()
+        return self.end - self.start()
+
+    def log(self):
+        took = self.end()
+        log_timings.info(f"[{self.label}] Took {took}.")
 
 
 class CustomAdapter(logging.LoggerAdapter):
@@ -39,6 +67,7 @@ class CustomAdapter(logging.LoggerAdapter):
 
 
 log = CustomAdapter(log)
+log_timings = CustomAdapter(log_timings)
 
 
 class IncorrectMemException(Exception):
@@ -128,6 +157,7 @@ class Mem:
         # that means we can add tokens that we can read back to see we are fully up to date
         log.info(f"Updating mem for partitions {sorted(p.partition for p in topic_partitions)} : {topic_partitions}")
         if not topic_partitions:
+            log.info("no partitions so we don't do anything with mem.")
             return
 
         if len(set(p.topic for p in topic_partitions)) > 1:
@@ -191,9 +221,11 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
     def __init__(self, consume_lock: asyncio.Lock, mem: Mem):
         self.mem = mem
         self.consume_lock = consume_lock
+        self.timer = Timer("rebalance")
 
     async def on_partitions_revoked(self, revoked):
         log.info(f"Revoked {revoked}")
+        self.timer.start()
         await self.consume_lock.acquire()  # pause processing of messages, when past this point no messages in flight
         log.debug("now have lock, i.e. no messages in flight")
 
@@ -201,6 +233,7 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
         log.info(f"Assigned {assigned}")
         await self.mem.update(assigned)
         self.consume_lock.release()  # start processing of messages again, partitions assigned are table
+        self.timer.log()
         log.debug("lock released; msg can fly again")
         # TODO: is it ok to release lock in on revoked (just ensure there is no message in flight, then ok???)
 
@@ -230,6 +263,10 @@ async def main(group_id_id):
     consumer.subscribe(["events"], listener=rbl)
     await mem.update(consumer.assignment())
 
+    log.info("STARTUP COMPLETE")
+
+    # await asyncio.sleep(10)
+
     try:
         # for two topics; do we need two locks, are they going to deadlock?
         while True:
@@ -237,7 +274,7 @@ async def main(group_id_id):
                 try:
                     msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
                     await handle_msg(msg, mem)
-                    await consumer.commit()
+                    await consumer.commit()    # can we make a transaction of produced in handle_msg and this commit?
                     log.debug(
                         f"  Committed {await consumer.committed(TopicPartition(msg.topic, msg.partition))}, assigned {sorted([t.partition for t in consumer.assignment()])}")
                 except asyncio.TimeoutError as e:
@@ -253,6 +290,7 @@ async def main(group_id_id):
 @click.option("--group-id-id", required=True, type=int)
 def cli(group_id_id):
     log.set_id(group_id_id)
+    log_timings.set_id(group_id_id)
     asyncio.run(main(group_id_id))
 
 

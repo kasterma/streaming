@@ -15,10 +15,19 @@ handlers:
     level: DEBUG
     formatter: simple
     filename: debug.log
+  timinghandler:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: simple
+    filename: timing.log
 loggers:
   counter:
-    level: INFO
+    level: DEBUG
     handlers: [console, file]
+    propagate: no
+  timings:
+    level: INFO
+    handlers: [timinghandler]
     propagate: no
 root:
   level: DEBUG
