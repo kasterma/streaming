@@ -252,7 +252,9 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
 async def handle_msg(msg, mem):
     log.info(f"  Handling msg: {msg.offset}-->{msg.key}:{msg.value}.")
     val = mem[msg.key.decode()]
-    val.append(int(msg.value.decode()))
+    new_val = int(msg.value.decode())
+    if not new_val in val:  # make idempotent; so if commit on mem-update happens, but not of read value don't crash
+        val.append(new_val)
     setitem_info = await mem.setitem(msg.key.decode(), val)
     #log.info(f"setiteminfo ={setitem_info.result()}")   # check partition here  msg.partition == partition of result
     log.info(f"  Done handling msg: {msg.value}")
