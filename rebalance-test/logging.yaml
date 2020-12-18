@@ -25,6 +25,11 @@ handlers:
     level: DEBUG
     formatter: simple
     filename: lock.log
+  eventloophandler:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: simple
+    filename: eventloop.log
 loggers:
   counter:
     level: DEBUG
@@ -37,6 +42,10 @@ loggers:
   locklog:
     level: INFO
     handlers: [lockhandler]
+    propagate: no
+  eventloop:
+    level: INFO
+    handlers: [eventloophandler]
     propagate: no
 root:
   level: DEBUG

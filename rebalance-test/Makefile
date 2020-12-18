@@ -22,7 +22,7 @@ clean-topics:
 	for i in $$(seq 0 9) ; do echo "key-$$i:" | kafkacat -b localhost:9092 -t mem-updater -Z -K: ; done
 
 generator:
-	${VENV} ; python send_events.py --delay-ms 10 --num-keys ${NUMKEYS}
+	${VENV} ; python send_events.py --delay-ms 1 --num-keys ${NUMKEYS}
 
 counter1:
 	${VENV} ; python counter.py --group-id-id 1

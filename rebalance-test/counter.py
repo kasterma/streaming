@@ -288,6 +288,7 @@ class LoggedLock:
         return getattr(self._lock, attr)
 
 async def main(group_id_id):
+    asyncio.create_task(start_eldm())
     mem = Mem(group_id_id=group_id_id)
     await mem.start()
     lock = asyncio.Lock()
@@ -310,7 +311,6 @@ async def main(group_id_id):
         # for two topics; do we need two locks, are they going to deadlock?
         while True:
             async with lock:
-                log.info(f"thread id {threading.get_ident()}")
                 lock_log.info(f"[main] LOCK")
                 try:
                     msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
@@ -328,12 +328,52 @@ async def main(group_id_id):
         await producer.stop()
 
 
+class EventLoopDelayMonitor:
+
+    def __init__(self, loop=None, start=True, interval=1, logger=None):
+        self._interval = interval
+        self._log = logger or logging.getLogger("eventloop")
+        self._loop = loop or asyncio.get_event_loop()
+        if start:
+            self.start()
+
+    def run(self):
+        self._loop.call_later(self._interval, self._handler, self._loop.time())
+
+    def _handler(self, start_time):
+        latency = (self._loop.time() - start_time) - self._interval
+        if latency > 0.05:
+            self._log.error('    EventLoop delay %.4f', latency)
+        else:
+            self._log.info('EventLoop delay %.4f', latency)
+        if not self.is_stopped():
+            self.run()
+
+    def is_stopped(self):
+        return self._stopped
+
+    def start(self):
+        self._stopped = False
+        self.run()
+
+    def stop(self):
+        self._stopped = True
+
+
+async def start_eldm():
+    EventLoopDelayMonitor(interval=1)
+
+
 @click.command()
 @click.option("--group-id-id", required=True, type=int)
 def cli(group_id_id):
     log.set_id(group_id_id)
     log_timings.set_id(group_id_id)
     lock_log.set_id(group_id_id)
+    loop = asyncio.get_event_loop()
+    loop.set_debug(enabled=True)
+    logging.getLogger("asyncio").setLevel(logging.DEBUG)
+    loop.slow_callback_duration = 1
     asyncio.run(main(group_id_id))
 
 
