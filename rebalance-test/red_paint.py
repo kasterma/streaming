@@ -182,13 +182,22 @@ async def main(delay_ms, red_paint_key, quiet):
     type=int,
     help="shortcut for --red-paint-key 0 ... --red-paint-key num-keys-1",
 )
-def cli(delay_ms, red_paint_key, num_keys):
+@click.option(
+    "--start-key",
+    type=int,
+    default=0,
+    help="In combination with num-keys makes keys used [start-key, ..., start-key+num_keys-1]."
+)
+@click.option(
+    "--quiet/--no-quiet", type=bool, default=False
+)
+def cli(delay_ms, red_paint_key, num_keys, start_key, quiet):
     if red_paint_key and num_keys:
         print("Please only provide one of red_paint_key or num_keys")
         sys.exit(1)
     if num_keys:
-        red_paint_key = tuple(range(num_keys))
-    asyncio.run(main(delay_ms, red_paint_key))
+        red_paint_key = tuple(range(start_key, start_key + num_keys))
+    asyncio.run(main(delay_ms, red_paint_key, quiet))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 VENV=. venv/bin/activate
 NUMPART=10
-NUMKEYS=1000
+NUM_KEYS?=1000
+START_KEY?=0
 
 venv:
 	python3.8 -m venv venv
@@ -26,7 +27,7 @@ clean-topics:
 	for i in $$(seq 0 9) ; do echo "key-$$i:" | kafkacat -b localhost:9092 -t mem-updater -Z -K: ; done
 
 generator:
-	${VENV} ; python send_events.py --delay-ms 1 --num-keys ${NUMKEYS}
+	${VENV} ; python red_paint.py --delay-ms 100 --num-keys ${NUM_KEYS} --start-key ${START_KEY} --quiet
 
 counter1:
 	${VENV} ; python counter.py --group-id-id 1
