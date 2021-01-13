@@ -7,3 +7,4 @@ aiokafka
 #fastapi_contrib[jaegertracing]
 pyyaml
 click
+black

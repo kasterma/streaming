@@ -249,13 +249,14 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
 
 
 
-async def handle_msg(msg, mem):
+async def handle_msg(msg, mem, producer: aiokafka.AIOKafkaProducer):
     log.info(f"  Handling msg: {msg.offset}-->{msg.key}:{msg.value}.")
     val = mem[msg.key.decode()]
     new_val = int(msg.value.decode())
     if not new_val in val:  # make idempotent; so if commit on mem-update happens, but not of read value don't crash
         val.append(new_val)
     setitem_info = await mem.setitem(msg.key.decode(), val)
+    producer.send("event-lists", value=new_val, key=msg.key)
     #log.info(f"setiteminfo ={setitem_info.result()}")   # check partition here  msg.partition == partition of result
     log.info(f"  Done handling msg: {msg.value}")
 
@@ -314,7 +315,7 @@ async def main(group_id_id):
                 lock_log.info(f"[main] LOCK")
                 try:
                     msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
-                    await handle_msg(msg, mem)
+                    await handle_msg(msg, mem, producer)
                     await consumer.commit()    # can we make a transaction of produced in handle_msg and this commit?
                     log.debug(
                         f"  Committed {await consumer.committed(TopicPartition(msg.topic, msg.partition))}, assigned {sorted([t.partition for t in consumer.assignment()])}")

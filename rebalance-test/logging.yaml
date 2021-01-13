@@ -47,6 +47,10 @@ loggers:
     level: INFO
     handlers: [eventloophandler]
     propagate: no
+  redpaint:
+    level: INFO
+    handlers: [timinghandler]
+    propaget: no
 root:
   level: DEBUG
   handlers: [console]
