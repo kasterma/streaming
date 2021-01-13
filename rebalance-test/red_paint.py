@@ -28,6 +28,7 @@ import sys
 with open("logging.yaml") as f:
     dictConfig(yaml.load(f, Loader=yaml.SafeLoader))
 
+log = logging.getLogger("redpaintrunner")
 
 class RedPaint:
     """Generate the "customer(s)" behavior where we know downstream results for that we then check for.{key: len(self._in_flight[key].keys()) for key in self._keys}
@@ -35,9 +36,10 @@ class RedPaint:
     keys, randomly select the next key to send a value for.
     """
 
-    def __init__(self, keys: Tuple[int, ...], delay=1.0):
+    def __init__(self, keys: Tuple[int, ...], delay=1.0, quiet=False):
         self._keys = keys
         self._delay = delay
+        self._quiet = quiet
         self._next_value = defaultdict(int)
         self._in_flight = defaultdict(dict)
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -75,7 +77,8 @@ class RedPaint:
             inflight_counts = {
                 key: len(self._in_flight[key].keys()) for key in self._keys
             }
-            self._log.info(f"In flight event counts {inflight_counts}")
+            if not self._quiet:
+                self._log.info(f"In flight event counts {inflight_counts}")
             return (str(key).encode(), str(val).encode())
 
     def validate(self, pair):
@@ -83,32 +86,40 @@ class RedPaint:
 
         If there are multiple downstream points to check they will each have their own validate obviously.
         """
-        key = int(pair[0].decode())
-        val = json.loads(pair[1].decode())
-        if key not in self._keys:
-            self._log.debug(
-                f"Recvd value with key for other user {pair} should have key in {self._keys}."
-            )
-            return None  # not relevant for this user; will be most messages
+        try:
+            key = int(pair[0].decode())
+            val = json.loads(pair[1].decode())
+            if key not in self._keys:
+                if not self._quiet:
+                    self._log.debug(
+                        f"Recvd value with key for other user {pair} should have key in {self._keys}."
+                    )
+                return None  # not relevant for this user; will be most messages
 
-        if not val[-1] in self._in_flight[key].keys():
-            self._log.error(f"Recvd value not in flight {val} for key {key}")
-        else:
-            time_taken = time.monotonic() - self._in_flight[key][val[-1]]
-            del self._in_flight[key][
-                val[-1]
-            ]  # remove from dict to keep memory requirement low
-            self._log.info(f"Recvd value took {time_taken:.3f} seconds for key {key}")
-        valid = self._next_value[key] > val[-1] and val == list(range(val[-1] + 1))
-        if not valid:
-            self._log.error(
-                f"Recvd value was invalid {pair} {self._next_value[key] > val[-1]} {list(range(val[-1]))}"
-            )
-        return valid
+            if not val[-1] in self._in_flight[key].keys():
+                self._log.error(f"Recvd value not in flight {val} for key {key}")
+            else:
+                time_taken = time.monotonic() - self._in_flight[key][val[-1]]
+                del self._in_flight[key][
+                    val[-1]
+                ]  # remove from dict to keep memory requirement low
+                if time_taken > 1.0:
+                    self._log.error(f"Recvd value {val} took {time_taken:.3f} seconds for key {key}")
+                elif not self._quiet:
+                    self._log.info(f"Recvd value took {time_taken:.3f} seconds for key {key}")
+            valid = self._next_value[key] > val[-1] and val == list(range(val[-1] + 1))
+            if not valid:
+                self._log.error(
+                    f"Recvd value was invalid {pair} {self._next_value[key] > val[-1]} {list(range(val[-1]))}"
+                )
+            return valid
+        except ValueError as e:
+            self._log.error(f"Recvd value with ValueError: {e}")
 
 
 async def send_paint(paint: RedPaint, producer: aiokafka.AIOKafkaProducer):
     async for msg in paint:
+        log.debug(f"send {msg}")
         await producer.send("events", key=msg[0], value=msg[1])
 
 
@@ -118,13 +129,12 @@ async def recv_paint(paint: RedPaint, consumer: aiokafka.AIOKafkaConsumer, wait_
         1  # if count gets too high, stop generating new events.  Something is broken.
     )
     while True:
-        if time.monotonic() - last_time > 10 * wait_ct:
+        if time.monotonic() - last_time > wait_notice * wait_ct:
             if paint.is_sending():
-                print(f"No valid message in {wait_notice}*{wait_ct} seconds")
+                log.info(f"No valid message in {wait_notice}*{wait_ct} seconds")
             wait_ct += 1
-            if wait_ct > 1:
+            if wait_ct > 10:
                 await paint.pause_sending()
-            print("here")
         try:
             msg = await asyncio.wait_for(consumer.getone(), 1)
             if paint.validate((msg.key, msg.value)):
@@ -136,7 +146,7 @@ async def recv_paint(paint: RedPaint, consumer: aiokafka.AIOKafkaConsumer, wait_
             pass
 
 
-async def main(delay_ms, red_paint_key):
+async def main(delay_ms, red_paint_key, quiet):
     consumer = aiokafka.AIOKafkaConsumer(
         group_id="red_paint", enable_auto_commit=True, auto_offset_reset="earliest"
     )
@@ -145,7 +155,7 @@ async def main(delay_ms, red_paint_key):
     producer = aiokafka.AIOKafkaProducer()
     await producer.start()
     delay_s = delay_ms / 1000
-    paint = RedPaint(keys=red_paint_key, delay=delay_s)
+    paint = RedPaint(keys=red_paint_key, delay=delay_s, quiet=quiet)
 
     try:
         # start Task sending events
@@ -162,7 +172,7 @@ async def main(delay_ms, red_paint_key):
 
 @click.command()
 @click.option(
-    "--delay-ms", default=5000, type=int, help="delay between sending different values"
+    "--delay-ms", default=1000, type=int, help="delay between sending different values"
 )
 @click.option(
     "--red-paint-key", type=int, help="key for the red paint values", multiple=True

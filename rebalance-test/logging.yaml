@@ -51,6 +51,10 @@ loggers:
     level: INFO
     handlers: [timinghandler]
     propaget: no
+  redpaintrunner:
+    level: INFO
+    handlers: [timinghandler]
+    propaget: no
 root:
   level: DEBUG
   handlers: [console]
