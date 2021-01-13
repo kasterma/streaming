@@ -21,6 +21,7 @@ async def main(source_topic, sink_topic):
         new_val = int(msg.value.decode())
         if new_val not in val:  # make idempotent
             val.append(new_val)
+        print(f"Out value {msg.key.decode()} -> {val}")
         await producer.send(sink_topic, value=json.dumps(val).encode(), key=msg.key)
 
 
@@ -28,6 +29,7 @@ async def main(source_topic, sink_topic):
         while True:
             try:
                 msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
+                print(f"In value {msg.key.decode()} -> {msg.value.decode()}")
                 await handle_msg(msg)
                 await consumer.commit()    # can we make a transaction of produced in handle_msg and this commit?
             except asyncio.TimeoutError as e:
