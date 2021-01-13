@@ -109,8 +109,11 @@ class RedPaint:
                     self._log.info(f"Recvd value took {time_taken:.3f} seconds for key {key}")
             valid = self._next_value[key] > val[-1] and val == list(range(val[-1] + 1))
             if not valid:
+                max_len = 50
+                pair_str = str(pair)
+                pair_str = pair_str if len(pair_str) < max_len else pair_str[:max_len] + "..."
                 self._log.error(
-                    f"Recvd value was invalid {pair} {self._next_value[key] > val[-1]} {list(range(val[-1]))}"
+                    f"Recvd value was invalid {pair_str} (lv:{self._next_value[key] > val[-1]} and ran:{val == list(range(val[-1]))})"
                 )
             return valid
         except ValueError as e:
