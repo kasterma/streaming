@@ -28,6 +28,10 @@ class UnstartedMemUsed(Exception):
     pass
 
 
+class MemKeyFatalError(Exception):
+    pass
+
+
 class Mem:
     def __init__(self, group_id_id, memupdate_topicname="mem-updater"):
         # we should check here existence of the topic and that it has the right number of partitions.
@@ -38,6 +42,10 @@ class Mem:
         self.producer = aiokafka.AIOKafkaProducer()
         self.snapshots = [{}]  # start with empty snapshot so that below we can assume there always is a previous
         self.started = False
+        self._current_key = None
+
+    def set_current_key(self, key: str):
+        self._current_key = key
 
     async def start(self):
         await self.producer.start()
@@ -72,6 +80,8 @@ class Mem:
             raise IncorrectMemException(self)
 
     async def setitem(self, key: str, value: List[int]):
+        if not key == self._current_key:
+            raise MemKeyFatalError(f"Using key {key} in context of key {self._current_key}")
         self._setitem(key, value)
         return await self.producer.send(topic=self.memupdate_topicname,
                                         key=key.encode(),
@@ -220,6 +230,7 @@ class AIOKafkaMemConsumer:
                     msg = await asyncio.wait_for(
                         self._consumer.getone(), 1
                     )  # defensive against deadlock with lock
+                    self._mem.set_current_key(msg.key.decode())   # check key assumption on this; using the same keys
                     yield msg
                 except asyncio.TimeoutError as e:
                     # no messages in timeout time, this is normal behavior in case you produce less than 1 a second.
