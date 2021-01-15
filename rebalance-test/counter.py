@@ -12,6 +12,7 @@ import yaml
 import copy
 import time
 import threading
+from utils import Timer, get_logger, set_log_id
 
 # Thu: need to ensure that on_partitions_revoked doesn't finish before all msgs in flight have be handled.
 # Fri: there may be locking in aiokafka itself, also in ways that are hard to test for.
@@ -27,50 +28,9 @@ import threading
 with open("logging.yaml") as f:
     dictConfig(yaml.load(f, Loader=yaml.SafeLoader))
 
-log = logging.getLogger("counter")
-log_timings = logging.getLogger("timings")
-
-
-class Timer:
-    def __init__(self, label):
-        self._label = label
-        self._start = None
-        self._end = None
-        self._running = False
-
-    def start(self):
-        if self._running:
-            log.error(f"[{self._label}] starting running timer")
-        self._start = 0 #time.monotonic()
-        self._running = True
-
-    def end(self):
-        if not self._running:
-            log.error(f"[{self._label}] stopping stopped timer")
-        self._end = time.monotonic()
-        return self._end - self.start()
-
-    def log(self):
-        took = self.end()
-        log_timings.info(f"[{self._label}] Took {took}.")
-
-
-class CustomAdapter(logging.LoggerAdapter):
-    def __init__(self, log):
-        super().__init__(log, {})
-        self.id = "unset"
-
-    def set_id(self, id):
-        self.id = str(id)
-
-    def process(self, msg, kwargs):
-        return f'id[{self.id}] - {msg}', kwargs
-
-
-log = CustomAdapter(log)
-log_timings = CustomAdapter(log_timings)
-lock_log = CustomAdapter(logging.getLogger("locklog"))
-lock_log.set_id(id)
+log = get_logger("counter")
+log_timings = get_logger("timings")
+lock_log = get_logger("locklog")
 
 
 class IncorrectMemException(Exception):
@@ -243,7 +203,8 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
         lock_log.info(f"[rbal] release")
         self.consume_lock.release()  # start processing of messages again, partitions assigned are table
         lock_log.info(f"[rbal] UNLOCK")
-        self._timer.log()
+        self._timer.end()
+        log_timings.info(self._timer)
         log.debug("lock released; msg can fly again")
         # TODO: is it ok to release lock in on revoked (just ensure there is no message in flight, then ok???)
 
@@ -255,8 +216,8 @@ async def handle_msg(msg, mem, producer: aiokafka.AIOKafkaProducer):
     new_val = int(msg.value.decode())
     if not new_val in val:  # make idempotent; so if commit on mem-update happens, but not of read value don't crash
         val.append(new_val)
-    setitem_info = await mem.setitem(msg.key.decode(), val)
-    producer.send("event-lists", value=new_val, key=msg.key)
+    setitem_info = await mem.setitem(msg.key.decode(), val)   ### <------ UGLY but needed (for now)
+    await producer.send("event-lists", value=json.dumps(val).encode(), key=msg.key)
     #log.info(f"setiteminfo ={setitem_info.result()}")   # check partition here  msg.partition == partition of result
     log.info(f"  Done handling msg: {msg.value}")
 
@@ -265,8 +226,7 @@ class LoggedLock:
     def __init__(self, lock: asyncio.Lock, label, id):
         self._lock = lock
         self._label = label
-        self.log = CustomAdapter(logging.getLogger("locklog"))
-        self.log.set_id(id)
+        self.log = get_logger("locklog")
 
     async def acquire(self):
         self.log.debug(f"[{self.label}] trying to get lock")
@@ -287,6 +247,7 @@ class LoggedLock:
     def __getattr__(self, attr):
         print(attr)
         return getattr(self._lock, attr)
+
 
 async def main(group_id_id):
     asyncio.create_task(start_eldm())
@@ -368,9 +329,7 @@ async def start_eldm():
 @click.command()
 @click.option("--group-id-id", required=True, type=int)
 def cli(group_id_id):
-    log.set_id(group_id_id)
-    log_timings.set_id(group_id_id)
-    lock_log.set_id(group_id_id)
+    set_log_id(group_id_id)
     loop = asyncio.get_event_loop()
     loop.set_debug(enabled=True)
     logging.getLogger("asyncio").setLevel(logging.DEBUG)

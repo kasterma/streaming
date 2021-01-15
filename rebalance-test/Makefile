@@ -1,6 +1,6 @@
 VENV=. venv/bin/activate
 NUMPART=10
-NUM_KEYS?=1000
+NUM_KEYS?=20
 START_KEY?=0
 
 venv:
@@ -56,3 +56,13 @@ paint:
 
 format:
 	black red_paint.py
+
+
+kafkacat-event-lists:
+	kafkacat -b localhost -t event-lists -f 'Topic %t[%p], offset: %o, key: %k, payload: %S bytes: %s\n'
+
+kafkacat-events:
+	kafkacat -b localhost -t events -f 'Topic %t[%p], offset: %o, key: %k, payload: %S bytes: %s\n'
+
+kafkacat-mem-updater:
+	kafkacat -b localhost -t mem-updater -f 'Topic %t[%p], offset: %o, key: %k, payload: %S bytes: %s\n'

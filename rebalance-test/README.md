@@ -1,3 +1,41 @@
+# Rebalance Test
+
+## Demo
+
+start kafka and create topics
+
+    make up
+    make topcis
+
+start paint for explanation
+
+    make paint-explain
+
+after explaining what happens there, start counter for explanation
+
+    make counter-explain
+
+explain what we see there.  The make three points:
+
+1. restarting loses state
+2. can only run on one processor
+3. want to use the state data in other processors as well
+
+      - rebalance demo
+        
+            make counter1
+            make counter2
+        
+        start and stop them.  Then to get some data in mem, run
+        
+            make generate
+
+TODO:
+1. commit metadata
+
+
+## Notes
+
 testing the setup for a log topic
 
 generate events in order per partition

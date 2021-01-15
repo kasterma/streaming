@@ -9,7 +9,7 @@ mem = defaultdict(list)
 
 
 async def main(source_topic, sink_topic):
-    consumer = aiokafka.AIOKafkaConsumer(group_id="events_cons", enable_auto_commit=False, auto_offset_reset='earliest')
+    consumer = aiokafka.AIOKafkaConsumer(group_id="events_cons_explain", enable_auto_commit=False, auto_offset_reset='earliest')
     await consumer.start()
     consumer.subscribe([source_topic])
 
