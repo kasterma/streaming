@@ -55,7 +55,7 @@ paint:
 	${VENV} ; python red_paint.py --red-paint-key -2
 
 format:
-	black red_paint.py counter_explain.py
+	black red_paint.py counter_explain.py counter.py
 
 
 kafkacat-event-lists:
