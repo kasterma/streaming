@@ -30,6 +30,7 @@ with open("logging.yaml") as f:
 
 log = logging.getLogger("redpaintrunner")
 
+
 class RedPaint:
     """Generate the "customer(s)" behavior where we know downstream results for that we then check for.{key: len(self._in_flight[key].keys()) for key in self._keys}
     While checking these results, also record some timing info.  In this implementation when passed a tuple of
@@ -104,14 +105,20 @@ class RedPaint:
                     val[-1]
                 ]  # remove from dict to keep memory requirement low
                 if time_taken > 1.0:
-                    self._log.error(f"Recvd value {val} took {time_taken:.3f} seconds for key {key}")
+                    self._log.error(
+                        f"Recvd value {val} took {time_taken:.3f} seconds for key {key}"
+                    )
                 elif not self._quiet:
-                    self._log.info(f"Recvd value took {time_taken:.3f} seconds for key {key}")
+                    self._log.info(
+                        f"Recvd value took {time_taken:.3f} seconds for key {key}"
+                    )
             valid = self._next_value[key] > val[-1] and val == list(range(val[-1] + 1))
             if not valid:
                 max_len = 50
                 pair_str = str(pair)
-                pair_str = pair_str if len(pair_str) < max_len else pair_str[:max_len] + "..."
+                pair_str = (
+                    pair_str if len(pair_str) < max_len else pair_str[:max_len] + "..."
+                )
                 self._log.error(
                     f"Recvd value was invalid {pair_str} (lv:{self._next_value[key] > val[-1]} and ran:{val == list(range(val[-1]))})"
                 )
@@ -189,11 +196,9 @@ async def main(delay_ms, red_paint_key, quiet):
     "--start-key",
     type=int,
     default=0,
-    help="In combination with num-keys makes keys used [start-key, ..., start-key+num_keys-1]."
+    help="In combination with num-keys makes keys used [start-key, ..., start-key+num_keys-1].",
 )
-@click.option(
-    "--quiet/--no-quiet", type=bool, default=False
-)
+@click.option("--quiet/--no-quiet", type=bool, default=False)
 def cli(delay_ms, red_paint_key, num_keys, start_key, quiet):
     if red_paint_key and num_keys:
         print("Please only provide one of red_paint_key or num_keys")

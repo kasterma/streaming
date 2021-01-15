@@ -9,7 +9,11 @@ mem = defaultdict(list)
 
 
 async def main(source_topic, sink_topic):
-    consumer = aiokafka.AIOKafkaConsumer(group_id="events_cons_explain", enable_auto_commit=False, auto_offset_reset='earliest')
+    consumer = aiokafka.AIOKafkaConsumer(
+        group_id="events_cons_explain",
+        enable_auto_commit=False,
+        auto_offset_reset="earliest",
+    )
     await consumer.start()
     consumer.subscribe([source_topic])
 
@@ -24,14 +28,13 @@ async def main(source_topic, sink_topic):
         print(f"Out value {msg.key.decode()} -> {val}")
         await producer.send(sink_topic, value=json.dumps(val).encode(), key=msg.key)
 
-
     try:
         while True:
             try:
-                msg = await asyncio.wait_for(consumer.getone(), 1)  # defensive against deadlock with lock
+                msg = await asyncio.wait_for(consumer.getone(), 1)
                 print(f"In value {msg.key.decode()} -> {msg.value.decode()}")
                 await handle_msg(msg)
-                await consumer.commit()    # can we make a transaction of produced in handle_msg and this commit?
+                await consumer.commit()
             except asyncio.TimeoutError as e:
                 # no messages in timeout time, this is normal behavior in case you produce less than 1 a second.
                 pass
