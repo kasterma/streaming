@@ -15,10 +15,11 @@ after explaining what happens there, start counter for explanation
 
     make counter-explain
 
-explain what we see there.  The make three points:
+explain what we see there (also explain need for make idempotent).  The make three points:
 
 1. restarting loses state
 2. can only run on one processor
+   when we try to preserve state by e.g. local files, rebalancing happens during startup
 3. want to use the state data in other processors as well
 
       - rebalance demo
@@ -29,6 +30,10 @@ explain what we see there.  The make three points:
         start and stop them.  Then to get some data in mem, run
         
             make generate
+
+Alternate solution (for all but 3) use a database.
+
+Now start all counters and generate with lots of data.  Then start and stop.
 
 TODO:
 1. commit metadata

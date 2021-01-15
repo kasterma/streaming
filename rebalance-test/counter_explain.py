@@ -23,7 +23,7 @@ async def main(source_topic, sink_topic):
     async def handle_msg(msg):
         val = mem[msg.key.decode()]
         new_val = int(msg.value.decode())
-        if new_val not in val:  # make idempotent
+        if new_val not in val:  # make idempotent; see the time gap between setting this and the consumer.commit
             val.append(new_val)
         print(f"Out value {msg.key.decode()} -> {val}")
         await producer.send(sink_topic, value=json.dumps(val).encode(), key=msg.key)

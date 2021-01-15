@@ -12,7 +12,7 @@ import yaml
 import copy
 import time
 import threading
-from utils import Timer, get_logger, set_log_id
+from utils import Timer, get_logger, set_log_id, start_eldm
 
 # Thu: need to ensure that on_partitions_revoked doesn't finish before all msgs in flight have be handled.
 # Fri: there may be locking in aiokafka itself, also in ways that are hard to test for.
@@ -222,33 +222,6 @@ async def handle_msg(msg, mem, producer: aiokafka.AIOKafkaProducer):
     log.info(f"  Done handling msg: {msg.value}")
 
 
-class LoggedLock:
-    def __init__(self, lock: asyncio.Lock, label, id):
-        self._lock = lock
-        self._label = label
-        self.log = get_logger("locklog")
-
-    async def acquire(self):
-        self.log.debug(f"[{self.label}] trying to get lock")
-        await self._lock.acquire()
-        self.log.debug(f"[{self.label}] LOCK")
-
-    def release(self):
-        self.log.debug(f"[{self.label}] releasing lock")
-        self._lock.release()
-        self.log.debug(f'[{self.label}] UNLOCK')
-
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        return self._lock.__aexit__(exc_type, exc_val, exc_tb)
-
-    def __aenter__(self):
-        return self._lock.__aenter__()
-
-    def __getattr__(self, attr):
-        print(attr)
-        return getattr(self._lock, attr)
-
-
 async def main(group_id_id):
     asyncio.create_task(start_eldm())
     mem = Mem(group_id_id=group_id_id)
@@ -288,42 +261,6 @@ async def main(group_id_id):
     finally:
         await consumer.stop()
         await producer.stop()
-
-
-class EventLoopDelayMonitor:
-
-    def __init__(self, loop=None, start=True, interval=1, logger=None):
-        self._interval = interval
-        self._log = logger or logging.getLogger("eventloop")
-        self._loop = loop or asyncio.get_event_loop()
-        if start:
-            self.start()
-
-    def run(self):
-        self._loop.call_later(self._interval, self._handler, self._loop.time())
-
-    def _handler(self, start_time):
-        latency = (self._loop.time() - start_time) - self._interval
-        if latency > 0.05:
-            self._log.error('    EventLoop delay %.4f', latency)
-        else:
-            self._log.info('EventLoop delay %.4f', latency)
-        if not self.is_stopped():
-            self.run()
-
-    def is_stopped(self):
-        return self._stopped
-
-    def start(self):
-        self._stopped = False
-        self.run()
-
-    def stop(self):
-        self._stopped = True
-
-
-async def start_eldm():
-    EventLoopDelayMonitor(interval=1)
 
 
 @click.command()
