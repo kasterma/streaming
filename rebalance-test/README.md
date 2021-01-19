@@ -5,7 +5,7 @@
 start kafka and create topics
 
     make up
-    make topcis
+    make topics
 
 start paint for explanation
 
@@ -17,23 +17,33 @@ after explaining what happens there, start counter for explanation
 
 explain what we see there (also explain need for make idempotent).  The make three points:
 
-1. restarting loses state
+1. restarting loses state  (show and show how red-paint logs)
 2. can only run on one processor
    when we try to preserve state by e.g. local files, rebalancing happens during startup
 3. want to use the state data in other processors as well
 
       - rebalance demo
         
-            make counter1
+            make counter1    (show that red-paint now shows item was not in flight)
             make counter2
         
-        start and stop them.  Then to get some data in mem, run
+        start and stop them.  Explain the two phases first all get on_partitions_revoked (so some are already processing
+        this while others may still be boing), only then all get on_partitions_assigned (that is kafka ensures that
+        *all* on_partitions_revoked are called before the first on_partitions_assigned is called).  Show rebalance
+        listener here, and point to the lock.
+        Then to get some data in mem, run
         
-            make generate
+            make paint
+  
+        Talk about reloading data.  There are many buffers in kafka, need to ensure all are flushed to know we have
+        the latest data.  This is the point of the tokens, show mem.update here.
 
 Alternate solution (for all but 3) use a database.
 
 Now start all counters and generate with lots of data.  Then start and stop.
+
+Note: in each processor we store the state in memory once retreived from kafka.  If this becomes too memory intensive
+could use e.g. sqlite in the processor for this.
 
 TODO:
 1. commit metadata

@@ -47,6 +47,10 @@ async def main(group_id_id):
 
     async def handle_msg(msg):
         log.info(f"  Handling msg: {msg.offset}-->{msg.key}:{msg.value}.")
+        # the key in mem[key] should be the message key, that is how we align mem data with source
+        # topic data.  This is also checked in the AIOKafkaMemConsumer.  There are other solutions
+        # to this, but for now we have only implemented this one.  Also we work under the assumption
+        # that the source topic doesn't do any custom partition assignments.
         val = mem[msg.key.decode()]
         new_val = int(msg.value.decode())
         if (
@@ -60,14 +64,15 @@ async def main(group_id_id):
         log.info(f"  Done handling msg: {msg.value}")
 
     try:
-        # for two topics; do we need two locks, are they going to deadlock?
         async for msg in consumer.items():
             await handle_msg(msg)
-            await consumer.commit()  # can we make a transaction of produced in handle_msg and this commit?
+            await consumer.commit()  # this commit should happen after the mem.setitem
 
     finally:
+        print("stopping consumer/producer")
         await consumer.stop()
         await producer.stop()
+        print("done")
 
 
 @click.command()

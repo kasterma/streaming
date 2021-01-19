@@ -1,7 +1,7 @@
 VENV=. venv/bin/activate
 NUMPART=10
 NUM_KEYS?=20
-START_KEY?=0
+START_KEY?=10
 
 venv:
 	python3.8 -m venv venv
@@ -52,7 +52,7 @@ paint-explain:
 	${VENV} ; python red_paint.py --red-paint-key ${RED_PAINT_KEY}
 
 paint:
-	${VENV} ; python red_paint.py --red-paint-key -2
+	${VENV} ; python red_paint.py --delay-ms 100 --num-keys 10 --start-key 0 --quiet
 
 format:
 	black red_paint.py counter_explain.py counter.py

@@ -77,7 +77,9 @@ class Mem:
         log.debug(f"_mem {self}")
         if not self.mem_correct():
             log.error("Mem not correct")
-            raise IncorrectMemException(self)
+            # raise IncorrectMemException(self)  for now we are not throwing this error, b/c it means an error
+            # becomes unrecoverable.  No processor can start that attempts to load the incorrect entry.  Just logging
+            # and continuing seems the better process for now.
 
     async def setitem(self, key: str, value: List[int]):
         if not key == self._current_key:
