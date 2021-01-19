@@ -15,5 +15,14 @@ generator:
 counter:
 	${VENV} ; faust -A counter worker -l info --web-port 6022 --web-host localhost
 
+counter2:
+	${VENV} ; faust -A counter worker -l info --web-port 6023 --web-host localhost
+
+counter3:
+	${VENV} ; faust -A counter worker -l info --web-port 6024 --web-host localhost
+
+counter4:
+	${VENV} ; faust -A counter worker -l info --web-port 6025 --web-host localhost
+
 checker:
 	${VENV} ; faust -A checker worker -l info --web-port 6021 --web-host localhost
