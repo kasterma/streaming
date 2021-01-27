@@ -27,16 +27,18 @@ explain what we see there (also explain need for make idempotent).  The make thr
             make counter1    (show that red-paint now shows item was not in flight)
             make counter2
         
-        start and stop them.  Explain the two phases first all get on_partitions_revoked (so some are already processing
-        this while others may still be boing), only then all get on_partitions_assigned (that is kafka ensures that
-        *all* on_partitions_revoked are called before the first on_partitions_assigned is called).  Show rebalance
-        listener here, and point to the lock.
         Then to get some data in mem, run
         
             make paint
-  
-        Talk about reloading data.  There are many buffers in kafka, need to ensure all are flushed to know we have
-        the latest data.  This is the point of the tokens, show mem.update here.
+        
+        1. start and stop them. 
+        2. Explain the two phases first all get on_partitions_revoked (so some are already processing
+           this while others may still be boing), only then all get on_partitions_assigned (that is kafka ensures that
+           *all* on_partitions_revoked are called before the first on_partitions_assigned is called). 
+        3. Show rebalance listener here, and point to the lock.
+        4. Also point to the tokens going through the mem topic. 
+        5. Talk about reloading data.  There are many buffers in kafka, need to ensure all are flushed to know we have
+           the latest data.  This is the point of the tokens, show mem.update here.
 
 Alternate solution (for all but 3) use a database.
 

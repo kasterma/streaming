@@ -83,3 +83,13 @@ class EventLoopDelayMonitor:
 
 async def start_eldm():
     EventLoopDelayMonitor(interval=1)
+
+
+def shortlist(l):
+    l_min, l_max = min(l), max(l)
+    if l == list(range(l_min, l_max + 1)) and len(l) > 3:
+        # good
+        return f"[{l[0]}, ..., {l[-1]}]"
+    else:
+        # bad, or short
+        return str(l)

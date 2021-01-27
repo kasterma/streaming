@@ -9,7 +9,7 @@ from typing import Dict, List
 import aiokafka
 from kafka import TopicPartition
 
-from utils import get_logger, Timer
+from utils import get_logger, Timer, shortlist
 
 log = get_logger("counter")
 log_timings = get_logger("timings")
@@ -95,16 +95,6 @@ class Mem:
         return self._mem[item]
 
     @staticmethod
-    def shortlist(l):
-        l_min, l_max = min(l), max(l)
-        if l == list(range(l_min, l_max + 1)) and len(l) > 3:
-            # good
-            return f"[{l[0]}, ..., {l[-1]}]"
-        else:
-            # bad, or short
-            return str(l)
-
-    @staticmethod
     def value_correct(l):
         return l == list(range(len(l)))
 
@@ -174,7 +164,7 @@ class Mem:
         ks = sorted(self._mem.keys())
         rv = "{\n"
         for k in ks:
-            rv += f"{k}: {self.shortlist(self._mem[k])},\n"
+            rv += f"{k}: {shortlist(self._mem[k])},\n"
         return rv[:-2] + "}"
 
 

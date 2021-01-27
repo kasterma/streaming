@@ -24,6 +24,8 @@ import yaml
 import json
 import sys
 
+from utils import shortlist
+
 
 with open("logging.yaml") as f:
     dictConfig(yaml.load(f, Loader=yaml.SafeLoader))
@@ -98,7 +100,7 @@ class RedPaint:
                 return None  # not relevant for this user; will be most messages
 
             if not val[-1] in self._in_flight[key].keys():
-                self._log.error(f"Recvd value not in flight {val} for key {key}")
+                self._log.error(f"Recvd value not in flight {shortlist(val)} for key {key}")
             else:
                 time_taken = time.monotonic() - self._in_flight[key][val[-1]]
                 del self._in_flight[key][
@@ -106,7 +108,7 @@ class RedPaint:
                 ]  # remove from dict to keep memory requirement low
                 if time_taken > 1.0:
                     self._log.error(
-                        f"Recvd value {val} took {time_taken:.3f} seconds for key {key}"
+                        f"Recvd value {shortlist(val)} took {time_taken:.3f} seconds for key {key}"
                     )
                 elif not self._quiet:
                     self._log.info(

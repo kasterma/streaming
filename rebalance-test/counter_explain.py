@@ -5,6 +5,8 @@ import aiokafka
 import click
 import json
 
+from utils import shortlist
+
 
 async def main(source_topic, sink_topic):
     consumer = aiokafka.AIOKafkaConsumer(
@@ -27,7 +29,7 @@ async def main(source_topic, sink_topic):
             new_val not in val
         ):  # make idempotent; see the time gap between setting this and the consumer.commit
             val.append(new_val)
-        print(f"Out value {msg.key.decode()} -> {val}")
+        print(f"Out value {msg.key.decode()} -> {shortlist(val)}")
         await producer.send(sink_topic, value=json.dumps(val).encode(), key=msg.key)
 
     try:
