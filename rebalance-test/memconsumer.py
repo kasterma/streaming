@@ -181,6 +181,7 @@ class RebalanceListener(aiokafka.ConsumerRebalanceListener):
         self._timer.start()
         lock_log.info(f"[rbal] acquire")
         await self.consume_lock.acquire()  # pause processing of messages, when past this point no messages in flight
+        await self.mem.producer.flush()  # ensure the buffers are empty
         lock_log.info(f"[rbal] LOCK")
         log.debug("now have lock, i.e. no messages in flight")
 
